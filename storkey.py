@@ -1,6 +1,6 @@
 
 import torch
-from Hopfield.hopfield_baseline import HopfieldRNN
+from hopfield_baseline import HopfieldRNN
 
 
 class HopfieldRNNStorkey(HopfieldRNN):
