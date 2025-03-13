@@ -34,7 +34,7 @@ class SpikingHN:
         np.fill_diagonal(self.W, 0)
         self.W /= c_prime
     
-    def forward(self, start_pattern, time_steps=1000):
+    def forward(self, start_pattern, time_steps=250):
         '''
         INPUTS
             start_pattern: sqrt(N) x sqrt(N) array with values of 1 and -1
@@ -42,7 +42,7 @@ class SpikingHN:
         '''
         v = -65 * np.ones((self.N, 1))      # Initialize membrane potential
         u = self.b * -65                    # Initialize membrane recovery
-        gamma = 100                              # Input current gaining factor
+        gamma = 1                              # Input current gaining factor
 
         # Convert -1's in starting pattern to 0's because we're not sure if neurons like negative inputs
         # Then convert it to numpy column vector
@@ -58,14 +58,15 @@ class SpikingHN:
                 # Initial external input (the starting pattern)
                 # Equation from https://www.seti.net/Neuron%20Lab/NeuronReferences/Izhikevich%20Model%20and%20backpropagation.pdf
                 I = gamma * (start_pattern.T @ self.W)
+                # print(f"I shape: {np.shape(I)}")
             else:
                 # External input at all other time steps (just noise)
-                I = 0.1 * np.random.rand(self.N, 1)
+                I = 0.1 * np.random.rand(1, self.N)
 
             # When membrane potential `v` goes above 30 mV, we find the index, and append it to `fired`,
             # then reset `v` and membrane recovery variable `u`
             fired = np.where(v > 30)
-            firings_across_time.append([t + 0 * fired[0], fired[0]])
+            firings_across_time.append(fired[0])
             voltage_across_time.append(float(v[10]))
 
             # Reset membrane potential/recovery of neurons that have fired
@@ -75,14 +76,22 @@ class SpikingHN:
             
             # Update input currents using weights and membrane potentials of fired neurons
             # Inspired by https://www.fabriziomusacchio.com/blog/2024-05-19-izhikevich_network_model/#input-current
-            I += np.expand_dims(np.sum(self.W[:, fired[0]] @ v[fired[0]], axis = 1), axis = 1)
+            # print(f"v_fired shape: {np.shape(v[fired[0]])}")
+            # print(f"W fired shape: {np.shape(self.W[:, fired[0]])}")
+            if len(v[fired[0]]) > 0:
+                I += np.expand_dims(np.sum(v[fired[0]].T @ self.W[:, fired[0]], axis = 1), axis = 1)
+            else:
+                I += np.expand_dims(np.sum(self.W[:, fired[0]], axis = 1), axis = 1).T
 
             # Update membrane potential `v` and recovery var `u`
             # Note: for `v` we have to do 0.5ms increments for numerical stability
-            v += 0.5 * (0.04 * v**2 + 5 * v + 140 - u + I)
-            v += 0.5 * (0.04 * v**2 + 5 * v + 140 - u + I)
+            # print(f"v shape: {np.shape(v)}")
+            # print(f"u shape: {np.shape(u)}")
+            # print(f"I.T shape: {np.shape(I.T)}")
+            v += 0.5 * (0.04 * v**2 + 5 * v + 140 - u + I.T)
+            v += 0.5 * (0.04 * v**2 + 5 * v + 140 - u + I.T)
             u = u + self.a * (self.b * v - u)
 
-        output_pattern = np.where(v > 30, 1, -1)[0]      
+        # output_pattern = np.where(v > 30, 1, -1)[0]      
         voltage_across_time = np.array(voltage_across_time)
-        return output_pattern, firings_across_time, voltage_across_time
+        return firings_across_time, voltage_across_time
