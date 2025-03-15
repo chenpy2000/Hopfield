@@ -18,7 +18,7 @@ class SpikingHN:
         self.c = -65 + 15 * self.r**2       # After-spike reset value for `v`
         self.d = 8 - 6 * self.r**2          # After-spike reset value for `u`
     
-    def train(self, patterns, a=0.4, b=0.4):
+    def train(self, patterns, a=0.35, b=0.35):
         '''
         Training regime for low-activity patterns (which are more biologically plausible)
         Weight update equation taken from https://neuronaldynamics.epfl.ch/online/Ch17.S2.html
@@ -53,7 +53,7 @@ class SpikingHN:
         '''
         v = -65 * np.ones((self.N, 1))      # Initialize membrane potential
         u = self.b * -65                    # Initialize membrane recovery
-        gamma = 50                               # Input current gaining factor
+        gamma = 25                               # Input current gain factor
 
         # Convert starting pattern to numpy row vector
         start_pattern = np.array(start_pattern).reshape(-1, 1).T
