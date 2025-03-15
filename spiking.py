@@ -1,10 +1,11 @@
 import numpy as np
 
-#### HOPFIELD NETWORK WITH SPIKING IZHIKEVICH NEURON MODELS ####
+''' ####   HOPFIELD NETWORK WITH SPIKING IZHIKEVICH NEURON MODELS  ####
 
-## Izhikevich model code adapted from https://medium.com/geekculture/the-izhikevich-neuron-model-fb5d953b41e5
-## and https://www.fabriziomusacchio.com/blog/2024-05-19-izhikevich_network_model
-## (but with inhibitory neuron stuff removed)
+Izhikevich model code adapted from https://medium.com/geekculture/the-izhikevich-neuron-model-fb5d953b41e5
+and https://www.fabriziomusacchio.com/blog/2024-05-19-izhikevich_network_model
+
+This network uses the parameters specified by Izhikevich (2003) for modeling excitatory regular spiking neurons. '''
 
 class SpikingHN:
     def __init__(self, N):
@@ -20,11 +21,11 @@ class SpikingHN:
     def train(self, patterns, a=0.4, b=0.4):
         '''
         Training regime for low-activity patterns (which are more biologically plausible)
-        Weight update equation taken from https://neuronaldynamics.epfl.ch/online/Ch17.S2.html#Ch17.E27
+        Weight update equation taken from https://neuronaldynamics.epfl.ch/online/Ch17.S2.html
 
         INPUTS:
             patterns: Array containing multiple sqrt(N) x sqrt(N) pattern arrays
-            a,b: Weight update equation constants (a = b is recommended for higher memory capacity)
+            a,b: Weight update constants (a = b is recommended for symmetric weights and higher memory capacity)
         '''
         patterns = np.array(patterns)
         activity = a        # Target activity level
@@ -41,7 +42,7 @@ class SpikingHN:
         np.fill_diagonal(self.W, 0)
         self.W *= c_prime
     
-    def forward(self, start_pattern, time_steps=500):
+    def forward(self, start_pattern, time_steps=250):
         '''
         INPUTS:
             start_pattern: sqrt(N) x sqrt(N) array
@@ -52,21 +53,22 @@ class SpikingHN:
         '''
         v = -65 * np.ones((self.N, 1))      # Initialize membrane potential
         u = self.b * -65                    # Initialize membrane recovery
-        gamma = 25                               # Input current gaining factor
+        gamma = 50                               # Input current gaining factor
 
-        # Convert starting pattern to numpy column vector
-        start_pattern = np.array(start_pattern).reshape(-1, 1)
+        # Convert starting pattern to numpy row vector
+        start_pattern = np.array(start_pattern).reshape(-1, 1).T
 
-        firings_across_time = []
+        firings_across_time: list[np.array] = []
+        firing_rates: np.array = np.zeros(self.N)
         fired: np.array
 
-        for t in range(1, time_steps + 1):
+        for t in range(time_steps):
             # External input current for all neurons at time t (using starting pattern)
             # Equation from https://www.seti.net/Neuron%20Lab/NeuronReferences/Izhikevich%20Model%20and%20backpropagation.pdf
-            I = gamma * (start_pattern.T @ self.W).T
+            I = gamma * (start_pattern @ self.W).T
 
             # Update input currents using weights and membrane potentials of neurons that fired at time t-1
-            if (t > 1) and (len(v[fired]) > 0):
+            if (t > 0) and (len(v[fired]) > 0):
                 I += np.expand_dims(np.sum(self.W[:, fired] @ v[fired], axis = 1), axis = 1)
 
             # Update membrane potential `v` and recovery variable `u`
@@ -78,14 +80,16 @@ class SpikingHN:
             # When membrane potential `v` goes above 30 mV, we find the index and append it to `fired`
             # Then append `fired` to `firings_across_time`
             fired = np.where(v > 30)[0]
-            if len(v[fired]) > 0:
-                firings_across_time.append(fired)
-            else:
-                firings_across_time.append(np.empty(1))
+            firings_across_time.append(fired)
 
             # Reset membrane potential/recovery of neurons that have fired
             for i in fired:
+                firing_rates[i] += 1
                 v[i][0] = self.c[i][0]
                 u[i][0] += self.d[i][0]
 
-        return firings_across_time
+        # Calculate firing rates
+        firing_rates /= (time_steps / 1000)
+        firing_rates = firing_rates.astype(int)
+
+        return firings_across_time, firing_rates
