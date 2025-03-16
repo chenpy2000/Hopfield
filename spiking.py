@@ -5,7 +5,7 @@ import numpy as np
 Izhikevich model code adapted from https://medium.com/geekculture/the-izhikevich-neuron-model-fb5d953b41e5
 and https://www.fabriziomusacchio.com/blog/2024-05-19-izhikevich_network_model
 
-This network uses the parameters specified by Izhikevich (2003) for modeling excitatory regular spiking neurons. '''
+This network uses the parameters specified for modeling excitatory regular spiking neurons. '''
 
 class SpikingHN:
     def __init__(self, N):
@@ -18,7 +18,7 @@ class SpikingHN:
         self.c = -65 + 15 * self.r**2       # After-spike reset value for `v`
         self.d = 8 - 6 * self.r**2          # After-spike reset value for `u`
     
-    def train(self, patterns, a=0.35, b=0.35):
+    def train(self, patterns, a=0.3, b=0.3):
         '''
         Training regime for low-activity patterns (which are more biologically plausible)
         Weight update equation taken from https://neuronaldynamics.epfl.ch/online/Ch17.S2.html
@@ -42,7 +42,7 @@ class SpikingHN:
         np.fill_diagonal(self.W, 0)
         self.W *= c_prime
     
-    def forward(self, start_pattern, time_steps=250):
+    def forward_pattern(self, start_pattern, time_steps=250):
         '''
         INPUTS:
             start_pattern: sqrt(N) x sqrt(N) array
@@ -93,3 +93,17 @@ class SpikingHN:
         firing_rates = firing_rates.astype(int)
 
         return firings_across_time, firing_rates
+
+    def forward(self, patterns):
+        grayscale_outputs = []
+        binarized_outputs = []
+
+        for pattern in patterns:
+            _, output = self.forward_pattern(pattern)
+            grayscale_outputs.append(output)
+
+            # Binarize pattern by setting black/white threshold at 10% of max firing rate in data
+            binarized = np.where(output > (0.10 * np.max(output)), 255, 0)
+            binarized_outputs.append(binarized)
+
+        return np.array(grayscale_outputs), np.array(binarized_outputs)
