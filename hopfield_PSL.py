@@ -13,8 +13,7 @@ class HopfieldPSL(nn.Module):
     def __init__(self):
         super(HopfieldPSL, self).__init__()
         
-        self.embed = nn.Embedding(1024, 2048)
-        self.skip = nn.Linear(2048, 1024)
+        self.skip = nn.Linear(1024, 1024)
         self.down = nn.Linear(1024, 100)
         self.up   = nn.Linear(100, 1024)
         self.activation = nn.Tanh()
@@ -24,10 +23,9 @@ class HopfieldPSL(nn.Module):
     def forward(self, x):
         states = []
 
-        for _ in range(5):
+        for _ in range(3):
             x_skip = self.skip(x)
-            embedding = self.embed(x)
-            x_hidden = self.activation(self.down(embedding))
+            x_hidden = self.activation(self.down(x))
             x_hidden = self.activation(self.up(x_hidden))
             x = x_skip + x_hidden  
             states.append(x)
@@ -35,10 +33,9 @@ class HopfieldPSL(nn.Module):
         return states
     
     def retrieve_pattern(self, x):
-        for _ in range(5):
+        for _ in range(1):
             x_skip = self.skip(x)
-            embedding = self.embed(x)
-            x_hidden = self.activation(self.down(embedding))
+            x_hidden = self.activation(self.down(x))
             x_hidden = self.activation(self.up(x_hidden))
             x = x_skip + x_hidden  
 
