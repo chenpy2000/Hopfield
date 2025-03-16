@@ -18,7 +18,7 @@ class SpikingHN:
         self.c = -65 + 15 * self.r**2       # After-spike reset value for `v`
         self.d = 8 - 6 * self.r**2          # After-spike reset value for `u`
     
-    def train(self, patterns, a=0.3, b=0.3):
+    def train(self, patterns, a=0.4, b=0.4):
         '''
         Training regime for low-activity patterns (which are more biologically plausible)
         Weight update equation taken from https://neuronaldynamics.epfl.ch/online/Ch17.S2.html
