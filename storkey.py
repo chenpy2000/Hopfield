@@ -9,20 +9,14 @@ import matplotlib.pyplot as plt
 import os
 import torch
 
-class HopfieldRNN(nn.Module):
-    def __init__(self, num_units):
-        super(HopfieldRNN, self).__init__()
-        self.num_units = num_units
-        self.weights = nn.Parameter(torch.zeros(num_units, num_units))
+from hopfield_baseline import HopfieldRNN
 
-    def store_patterns_storkey(self, patterns):
-        """
-        Implements incremental Storkey learning rule.
-    
-        Args:
-            patterns: Tensor of shape [num_patterns, num_units], values {-1, 1}
-        """
-        def local_field(pattern, weights):
+class HopfieldStorkey(HopfieldRNN):
+    def __init__(self, num_units):
+
+        super().__init__(num_units)
+
+    def local_field(self, pattern, weights):
             """
             Compute local field h for Storkey rule.
             
@@ -34,7 +28,15 @@ class HopfieldRNN(nn.Module):
                 Local field vector (shape: [num_units, 1])
             """
             return torch.matmul(weights, pattern) - torch.diag(weights).unsqueeze(1) * pattern
+
+    def store_patterns(self, patterns):
+        """
+        Implements incremental Storkey learning rule.
     
+        Args:
+            patterns: Tensor of shape [num_patterns, num_units], values {-1, 1}
+        """
+        
         num_patterns = patterns.shape[0]
         self.weights.data.zero_()  # reset weights to zero
     
@@ -45,7 +47,7 @@ class HopfieldRNN(nn.Module):
             previous_weights = self.weights.data.clone()
     
             # Compute the local field
-            h = local_field(pattern, previous_weights)  # Shape: [num_units, 1]
+            h = self.local_field(pattern, previous_weights)  # Shape: [num_units, 1]
     
             # Compute delta_W according to Storkey rule
             delta_W = (torch.matmul(pattern, pattern.T) -
@@ -58,33 +60,6 @@ class HopfieldRNN(nn.Module):
             # Incremental update of weights
             self.weights.data += delta_W
 
-
-    def forward(self, corrupted_patterns, max_iter=100):
-        patterns = corrupted_patterns.clone()
-        
-        for _ in range(max_iter):
-            reconstructed_patterns = torch.sign(torch.matmul(patterns, self.weights))
-            reconstructed_patterns[reconstructed_patterns==0] = 1
-            patterns = reconstructed_patterns
-            
-        return patterns
-
-    def recall_accuracy(self, corrupted_patterns, original_patters, max_iter=100):
-
-        recalled_patterns = self.forward(corrupted_patterns, max_iter)
-
-        # calculate accuracy based on number of exact pattern matches
-        correct_recalls = torch.sum(torch.all(recalled_patterns == original_patters, dim=1)).item()
-        accuracy = correct_recalls / corrupted_patterns.shape[0]
-
-        return accuracy
-    
-    def recall_loss(self, corrupted_patterns, original_patterns, max_iter=100):
-        
-        recalled_patterns = self.forward(corrupted_patterns, max_iter)
-        sse = torch.sum((original_patterns - recalled_patterns)**2)
-
-        return sse
 
 ####################################################################
 

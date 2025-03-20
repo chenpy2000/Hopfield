@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import os
 
+from hopfield_baseline import HopfieldRNN
+
 def encode(img):
     """
     Encodes a grayscale image (0-255) into a binary representation (-1,1).
@@ -18,6 +20,7 @@ def encode(img):
     Returns:
         torch.Tensor: Encoded binary vector of shape (H*W*8,), values in {-1,1}.
     """
+    img = img * 255 if img.max() <= 1 else img
     flat = img.flatten()
     flat_np = flat.numpy().astype(np.uint8)
     bits = np.unpackbits(flat_np.reshape(-1, 1), axis=1)
@@ -46,62 +49,45 @@ def decode(encoded):
     pixels = pixels.squeeze(1)
     
     img = torch.from_numpy(pixels).reshape(32, 32)  # Assuming a 32x32 image
+
+    # Normalize to [0, 1] range
+    img = img / 255.0  # Convert to [0, 1] range
+
     return img
+
+
 
 # Simple Grayscaled baseline Hopfield with 8192 num_units
 # change the class name in visualize_grayscale.ipynb file to see the results - memorizes 30 patterns
-class HopfieldRNNGrayscale(nn.Module):
+class HopfieldRNNGrayscale(HopfieldRNN):
     def __init__(self, num_units):
-        """
-        Hopfield-like network for grayscale images stored in binary form.
 
+        super().__init__(num_units)
+
+
+    def forward(self, corrupted_patterns, max_iter=100):
+        """
         Args:
-            num_units (int): Number of neurons (should match flattened encoded image size).
+            corrupted_patterns (torch.Tensor): Initial state (shape: [batch_size, num_units])
+            max_iter (int): Max number of recurrent updates
         """
-        super(HopfieldRNNGrayscale, self).__init__()
-        self.num_units = num_units
-        self.weights = nn.Parameter(torch.zeros(num_units, num_units), requires_grad=False)
 
-    def store_patterns(self, patterns):
-        """
-        Stores patterns using Hebbian learning.
-
-        Args:
-            patterns (torch.Tensor): Batch of encoded binary patterns (-1,1), shape [num_patterns, num_units].
-        """
-        W = torch.zeros(self.num_units, self.num_units, dtype=torch.float32)
-        for pattern in patterns:
-            W += torch.outer(pattern, pattern)  # Hebbian learning rule
-        
-        # No self-connections
-        W.fill_diagonal_(0)
-
-        # Normalize by number of patterns
-        self.weights.data = W / patterns.shape[0]
-
-    def forward(self, corrupted_patterns, max_iter=10):
-        """
-        Runs the Hopfield update rule on binary-encoded grayscale patterns.
-
-        Args:
-            corrupted_patterns (torch.Tensor): Encoded corrupted input patterns, shape [batch_size, num_units].
-            max_iter (int): Number of update iterations.
-
-        Returns:
-            torch.Tensor: Recalled binary-encoded patterns (-1,1).
-        """
         patterns = corrupted_patterns.clone()
 
         for _ in range(max_iter):
+
             # Hopfield update rule
             reconstructed_patterns = torch.sign(torch.matmul(patterns, self.weights))
 
-            # Avoid 0 states (set them to +1)
+            # avoid 0 states
             reconstructed_patterns[reconstructed_patterns == 0] = 1
 
-            patterns = reconstructed_patterns  # Update for next iteration
+            # update for next iteration
+            patterns = reconstructed_patterns
 
         return reconstructed_patterns
+
+
 
     def recall_accuracy(self, corrupted_patterns, original_patterns, max_iter=10):
         """
@@ -132,15 +118,15 @@ class HopfieldRNNGrayscale(nn.Module):
         Returns:
             float: Sum of squared pixel errors.
         """
-        recalled_patterns = self.forward(corrupted_patterns, max_iter)
+        recalled_patterns = self.forward(corrupted_patterns, max_iter).detach()
 
         # Convert back to grayscale
         decoded_recalled = torch.stack([decode(recalled) for recalled in recalled_patterns])
         decoded_original = torch.stack([decode(original) for original in original_patterns])
 
         # Compute sum of squared differences in pixel space
-        sse = torch.sum((decoded_original - decoded_recalled) ** 2)
-        return sse
+        mse = F.mse_loss(decoded_original, decoded_recalled)
+        return mse
 
 
 # Grayscaled baseline Hopfield with tanh non-linearity and hidden units of 4096, num_units of 8192
@@ -154,7 +140,7 @@ class HopfieldRNNGrayscaleTANH(nn.Module):
             num_units (int): Number of binary units in the input (flattened image).
             hidden_size (int): Number of hidden tanh units.
         """
-        super(HopfieldRNNGrayscale, self).__init__()
+        super(HopfieldRNNGrayscaleTANH, self).__init__()
         self.input_size = num_units
         self.hidden_size = hidden_size
 
@@ -219,23 +205,6 @@ class HopfieldRNNGrayscaleTANH(nn.Module):
         return reconstructed_patterns  # Output remains in {-1,1} format
 
 
-    def recall_accuracy(self, corrupted_patterns, original_patterns, max_iter=10):
-        """
-        Calculates recall accuracy based on exact binary matches.
-
-        Args:
-            corrupted_patterns (torch.Tensor): Noisy input patterns.
-            original_patterns (torch.Tensor): Ground truth patterns.
-            max_iter (int): Number of Hopfield iterations.
-
-        Returns:
-            float: Accuracy of pattern recall.
-        """
-        recalled_patterns = self.forward(corrupted_patterns, max_iter)
-        correct_recalls = torch.sum(torch.all(recalled_patterns == original_patterns, dim=1)).item()
-        accuracy = correct_recalls / corrupted_patterns.shape[0]
-        return accuracy
-
     def recall_loss(self, corrupted_patterns, original_patterns, max_iter=10):
         """
         Computes squared error loss in pixel space after decoding.
@@ -255,5 +224,5 @@ class HopfieldRNNGrayscaleTANH(nn.Module):
         decoded_original = torch.stack([decode(original) for original in original_patterns])
 
         # Compute sum of squared differences in pixel space
-        sse = torch.sum((decoded_original - decoded_recalled) ** 2)
-        return sse
+        mse = F.mse_loss(decoded_original, decoded_recalled)
+        return mse

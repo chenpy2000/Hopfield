@@ -49,10 +49,6 @@ class HopfieldRNN(nn.Module):
             # avoid 0 states
             reconstructed_patterns[reconstructed_patterns == 0] = 1
 
-            # if torch.all(reconstructed_patterns == corrupted_patterns):
-            #     print(f"Converged and exited early")
-            #     break   # converged, exit early
-
             # update for next iteration
             patterns = reconstructed_patterns
 
@@ -71,7 +67,10 @@ class HopfieldRNN(nn.Module):
     def recall_loss(self, corrupted_patterns, original_patterns, max_iter=100):
         
         recalled_patterns = self.forward(corrupted_patterns, max_iter)
-        sse = torch.sum((original_patterns - recalled_patterns)**2)
 
-        return sse
+        # sse = torch.sum((original_patterns - recalled_patterns)**2)
+        # return sse
+
+        mse = F.mse_loss(recalled_patterns, original_patterns)
+        return mse
         
