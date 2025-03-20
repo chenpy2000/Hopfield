@@ -10,7 +10,7 @@ This network uses the parameters specified for modeling excitatory regular spiki
 class SpikingHN:
     def __init__(self, N):
         self.N = N                          # Number of neurons
-        self.W = np.zeros((N, N))           # Weight matrix (variable "S" in original Izhikevich formulation)
+        self.S = np.zeros((N, N))           # Synaptic weight matrix
 
         self.r = np.random.rand(N, 1)       # Random factor
         self.a = 0.02 * np.ones((N, 1))     # Time scale of membrane recovery `u`
@@ -36,11 +36,11 @@ class SpikingHN:
         for pattern in patterns:
             zeta = (pattern + 1) / 2    # Derived from p^{\mu}_i = 2 \zeta^{\mu}_i - 1
             zeta = np.array(zeta).reshape(-1, 1)
-            self.W += np.dot(zeta - b_const, zeta.T - activity)
+            self.S += np.dot(zeta - b_const, zeta.T - activity)
         
         # Zero out diagonal and multiply W by c_prime
-        np.fill_diagonal(self.W, 0)
-        self.W *= c_prime
+        np.fill_diagonal(self.S, 0)
+        self.S *= c_prime
     
     def forward_pattern(self, start_pattern, time_steps=250):
         '''
@@ -65,11 +65,11 @@ class SpikingHN:
         for t in range(time_steps):
             # External input current for all neurons at time t (using starting pattern)
             # Equation from https://www.seti.net/Neuron%20Lab/NeuronReferences/Izhikevich%20Model%20and%20backpropagation.pdf
-            I = gamma * (start_pattern @ self.W).T
+            I = gamma * (start_pattern @ self.S).T
 
             # Update input currents using weights and membrane potentials of neurons that fired at time t-1
             if (t > 0) and (len(v[fired]) > 0):
-                I += np.expand_dims(np.sum(self.W[:, fired] @ v[fired], axis = 1), axis = 1)
+                I += np.expand_dims(np.sum(self.S[:, fired] @ v[fired], axis = 1), axis = 1)
 
             # Update membrane potential `v` and recovery variable `u`
             # Note: for `v` we have to calculate in 0.5ms increments for numerical stability
