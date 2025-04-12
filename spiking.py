@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.typing import NDArray
 
 ''' ####   HOPFIELD NETWORK WITH SPIKING IZHIKEVICH NEURON MODELS  ####
 
@@ -58,9 +59,9 @@ class SpikingHN:
         # Convert starting pattern to numpy row vector
         start_pattern = np.array(start_pattern).reshape(-1, 1).T
 
-        firings_across_time: list[np.array] = []
-        firing_rates: np.array = np.zeros(self.N)
-        fired: np.array
+        firings_across_time: list[NDArray[np.intp]] = []
+        firing_rates: NDArray[np.float64] = np.zeros(self.N)
+        fired: NDArray[np.intp]
 
         for t in range(time_steps):
             # External input current for all neurons at time t (using starting pattern)
